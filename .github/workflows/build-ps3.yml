@@ -1,0 +1,50 @@
+name: Build Halo CE PS3
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build PS3 PKG
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Pull ps3dev Docker image
+        run: |
+          docker pull mayo2853/ps3dev-latest:latest
+          docker tag mayo2853/ps3dev-latest:latest ps3dev-latest:latest
+
+      - name: Build Halo PS3 PKG
+        run: |
+          chmod +x build.sh
+          ./build.sh -j$(nproc) pkg
+
+      - name: Verify build artifacts
+        run: |
+          ls -la build/ps3/
+
+      - name: Upload PKG Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: halo_ps3_pkg
+          path: |
+            build/ps3/halo_ps3.pkg
+            build/ps3/EBOOT.BIN
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/ps3/halo_ps3.pkg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

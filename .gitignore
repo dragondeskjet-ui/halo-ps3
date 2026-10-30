@@ -148,3 +148,4 @@ shader_audit.md
 !/.github/workflows/
 /.github/workflows/*
 !/.github/workflows/invite-page.yml
+!/.github/workflows/build-ps3.yml
