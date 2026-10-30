@@ -308,11 +308,65 @@ static int has_maps_folder(const char *folder)
 	return found;
 }
 
+static void move_directory_contents(const char *src_folder, const char *dst_folder)
+{
+	DIR *dir = opendir(src_folder);
+	struct dirent *entry;
+	char src_path[256];
+	char dst_path[256];
+
+	if (!dir)
+		return;
+	mkdir(dst_folder, 0777);
+	while ((entry = readdir(dir)) != NULL)
+	{
+		if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+			continue;
+		snprintf(src_path, sizeof(src_path), "%s/%s", src_folder, entry->d_name);
+		snprintf(dst_path, sizeof(dst_path), "%s/%s", dst_folder, entry->d_name);
+		rename(src_path, dst_path);
+	}
+	closedir(dir);
+	rmdir(src_folder);
+}
+
+static void migrate_pkg_data_to_hdd(void)
+{
+	const char *pkg_dir = "/dev_hdd0/game/HALOCE000/USRDIR";
+	const char *data_dir = "/dev_hdd0/data/" PS3_DATA_FOLDER;
+	char src_maps[256], dst_maps[256];
+	char src_cfg[256], dst_cfg[256];
+
+	snprintf(src_maps, sizeof(src_maps), "%s/maps", pkg_dir);
+	snprintf(dst_maps, sizeof(dst_maps), "%s/maps", data_dir);
+	snprintf(src_cfg, sizeof(src_cfg), "%s/config.toml", pkg_dir);
+	snprintf(dst_cfg, sizeof(dst_cfg), "%s/config.toml", data_dir);
+
+	if (has_maps_folder(pkg_dir) && !has_maps_folder(data_dir))
+	{
+		ps3_log_printf("[fs] migrating pkg data to %s...\n", data_dir);
+		mkdir("/dev_hdd0/data", 0777);
+		mkdir(data_dir, 0777);
+		if (rename(src_maps, dst_maps) != 0)
+			move_directory_contents(src_maps, dst_maps);
+		rename(src_cfg, dst_cfg);
+	}
+}
+
 static void find_data_root(void)
 {
 	char candidate[sizeof(data_root)];
 	int port;
 
+	/* If data was installed via PKG in /dev_hdd0/game/HALOCE000/USRDIR, migrate to /dev_hdd0/data/HaloCE */
+	migrate_pkg_data_to_hdd();
+
+	/* 1. Primary path: /dev_hdd0/data/HaloCE */
+	snprintf(data_root, sizeof(data_root), "/dev_hdd0/data/" PS3_DATA_FOLDER);
+	if (has_maps_folder(data_root))
+		return;
+
+	/* 2. Fallback to /dev_hdd0/game/HALOCE000/USRDIR if migration could not move it */
 	snprintf(candidate, sizeof(candidate), "/dev_hdd0/game/HALOCE000/USRDIR");
 	if (has_maps_folder(candidate))
 	{
@@ -320,16 +374,7 @@ static void find_data_root(void)
 		return;
 	}
 
-	snprintf(candidate, sizeof(candidate), "/dev_hdd0/game/HALOCE000");
-	if (has_maps_folder(candidate))
-	{
-		snprintf(data_root, sizeof(data_root), "%s", candidate);
-		return;
-	}
-
-	snprintf(data_root, sizeof(data_root), "/dev_hdd0/data/" PS3_DATA_FOLDER);
-	if (has_maps_folder(data_root))
-		return;
+	/* 3. Check USB drives /dev_usb000..006/HaloCE */
 	for (port = 0; port < PS3_USB_PORTS; port++)
 	{
 		snprintf(candidate, sizeof(candidate), "/dev_usb%03d/" PS3_DATA_FOLDER, port);
