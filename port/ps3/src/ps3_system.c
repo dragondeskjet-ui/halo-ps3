@@ -46,7 +46,7 @@ static int monitor_running;
 static u64 time_base;
 static double timebase_frequency = 79800000.0;
 
-static char data_root[64];
+static char data_root[128];
 
 static uint32_t memory_lowest_bytes = 0xffffffffu;
 static double memory_lowest_seconds;
@@ -312,6 +312,20 @@ static void find_data_root(void)
 {
 	char candidate[sizeof(data_root)];
 	int port;
+
+	snprintf(candidate, sizeof(candidate), "/dev_hdd0/game/HALOCE000/USRDIR");
+	if (has_maps_folder(candidate))
+	{
+		snprintf(data_root, sizeof(data_root), "%s", candidate);
+		return;
+	}
+
+	snprintf(candidate, sizeof(candidate), "/dev_hdd0/game/HALOCE000");
+	if (has_maps_folder(candidate))
+	{
+		snprintf(data_root, sizeof(data_root), "%s", candidate);
+		return;
+	}
 
 	snprintf(data_root, sizeof(data_root), "/dev_hdd0/data/" PS3_DATA_FOLDER);
 	if (has_maps_folder(data_root))
